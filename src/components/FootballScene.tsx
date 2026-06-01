@@ -61,8 +61,8 @@ function getSceneViewportSettings() {
 
   return {
     cameraFov: isCompactPortrait ? MOBILE_CAMERA_FOV : DESKTOP_CAMERA_FOV,
-    radiusMultiplier: isCompactPortrait ? 3.2 : 1,
-    shiftVW: isCompactPortrait ? 0 : 25,
+    radiusMultiplier: isCompactPortrait ? 3.8 : 1,
+    shiftVW: isCompactPortrait ? 12 : 25,
   };
 }
 
