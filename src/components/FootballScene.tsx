@@ -21,6 +21,9 @@ import {
 const MODEL_URL = "/models/football.glb";
 const BASE_CAMERA_RADIUS = 14;
 const MODEL_SCALE = 1.6;
+const MOBILE_BREAKPOINT = 760;
+const MOBILE_CAMERA_FOV = 60;
+const DESKTOP_CAMERA_FOV = 42;
 
 type CameraBase = {
   radius: number;
@@ -50,6 +53,18 @@ type SharedSceneState = {
 type FootballModelProps = {
   onReady: () => void;
 };
+
+function getSceneViewportSettings() {
+  const aspect = window.innerWidth / window.innerHeight;
+  const isCompactPortrait =
+    window.innerWidth <= MOBILE_BREAKPOINT || aspect < 0.82;
+
+  return {
+    cameraFov: isCompactPortrait ? MOBILE_CAMERA_FOV : DESKTOP_CAMERA_FOV,
+    radiusMultiplier: isCompactPortrait ? 3.2 : 1,
+    shiftVW: isCompactPortrait ? 0 : 25,
+  };
+}
 
 function tintMaterial(material: MeshStandardMaterial) {
   material.roughness = Math.max(material.roughness, 0.56);
@@ -152,26 +167,32 @@ function SceneRig({
     const radF = lerp(startFrame.radF, endFrame.radF, localProgress);
     const base = cameraBaseRef.current;
     const dragState = dragRef.current;
+    const sceneSettings = getSceneViewportSettings();
 
     if (!dragState.active && delta < 0.1) {
       autoRotateThetaRef.current += delta * 0.8;
     }
 
-    const radius = base.radius * radF;
+    if ("fov" in camera && camera.fov !== sceneSettings.cameraFov) {
+      camera.fov = sceneSettings.cameraFov;
+      camera.updateProjectionMatrix();
+    }
+
+    const radius = base.radius * radF * sceneSettings.radiusMultiplier;
     const phi = base.phi + dragState.phi;
     const theta = base.theta + autoRotateThetaRef.current + dragState.theta;
     const camX = base.target[0] + radius * Math.cos(phi) * Math.sin(theta);
     const camY = base.target[1] + radius * Math.sin(phi);
     const camZ = base.target[2] + radius * Math.cos(phi) * Math.cos(theta);
-    const aspect = window.innerWidth / window.innerHeight;
-    const shiftVW = aspect < 1 ? 35 : 25;
 
     camera.position.set(camX, camY, camZ);
     target.current.set(base.target[0], base.target[1], base.target[2]);
     camera.lookAt(target.current);
 
     if (modelStageRef.current) {
-      modelStageRef.current.style.transform = `translateX(${align * shiftVW}vw)`;
+      modelStageRef.current.style.transform = `translateX(${
+        align * sceneSettings.shiftVW
+      }vw)`;
     }
   });
 
@@ -316,7 +337,12 @@ export function FootballScene() {
       <div id="model-container" ref={containerRef}>
         <div className="model-stage" ref={modelStageRef}>
           <Canvas
-            camera={{ fov: 42, near: 0.01, far: 100, position: [0, 2, 4] }}
+            camera={{
+              fov: DESKTOP_CAMERA_FOV,
+              near: 0.01,
+              far: 100,
+              position: [0, 2, 4],
+            }}
             className="model-canvas"
             dpr={[1, 2]}
             gl={{ alpha: true, antialias: true }}
