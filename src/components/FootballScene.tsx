@@ -20,6 +20,7 @@ import {
 
 const MODEL_URL = "/models/football.glb";
 const BASE_CAMERA_RADIUS = 14;
+const MODEL_SCALE = 1.6;
 
 type CameraBase = {
   radius: number;
@@ -91,7 +92,7 @@ function FootballModel({ onReady }: FootballModelProps) {
     const center = box.getCenter(new Vector3());
     const size = box.getSize(new Vector3());
     const maxDimension = Math.max(size.x, size.y, size.z) || 1;
-    const scale = 2 / maxDimension;
+    const scale = MODEL_SCALE / maxDimension;
 
     prepareModelObject(gltf.scene);
     model.scale.setScalar(scale);
