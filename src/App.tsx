@@ -1,7 +1,7 @@
 import { AmbientCanvas } from "./components/AmbientCanvas";
+import { FootballScene } from "./components/FootballScene";
 import { Navigation } from "./components/Navigation";
 import { ScrollContent } from "./components/ScrollContent";
-import { SketchfabScene } from "./components/SketchfabScene";
 import { useTheme } from "./hooks/useTheme";
 
 export function App() {
@@ -9,7 +9,7 @@ export function App() {
 
   return (
     <>
-      <SketchfabScene />
+      <FootballScene />
       <AmbientCanvas />
       <div className="vignette" />
       <Navigation />

@@ -11,4 +11,4 @@ A premium football landing page built with Vite, React, React Compiler, GSAP, an
 
 ## Notes
 
-The product model is loaded through Sketchfab's Viewer API so the original scroll-driven 3D camera behavior stays intact.
+The product model is served locally from `public/models/football.glb` and rendered with React Three Fiber so the scroll-driven 3D camera behavior stays intact.

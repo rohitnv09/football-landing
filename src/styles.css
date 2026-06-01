@@ -93,21 +93,28 @@ h3,
   pointer-events: none;
 }
 
-#sketchfab-container {
+#model-container {
   position: fixed;
   inset: 0;
   z-index: 5;
 }
 
-#api-frame {
+.model-stage,
+.model-canvas {
   width: 100%;
   height: 100%;
+}
+
+.model-stage {
   border: 0;
   background: transparent;
   filter: var(--iframe-filter) drop-shadow(0 0 20px var(--accent-glow))
     drop-shadow(0 0 40px var(--accent-glow));
-  pointer-events: none;
   transition: filter 0.5s ease;
+}
+
+.model-canvas {
+  background: transparent;
 }
 
 .vignette {
