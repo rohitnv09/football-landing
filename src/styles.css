@@ -468,6 +468,13 @@ h3,
 }
 
 @media (max-width: 760px) {
+  .ambient-canvas,
+  .vignette {
+    top: -18svh;
+    bottom: -18svh;
+    height: auto;
+  }
+
   .site-nav {
     top: 0.75rem;
     width: calc(100vw - 1rem);
