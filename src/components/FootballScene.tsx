@@ -7,6 +7,7 @@ import {
   Mesh,
   MeshStandardMaterial,
   Vector3,
+  type Camera,
   type Object3D,
 } from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -24,6 +25,16 @@ const MODEL_SCALE = 1.6;
 const MOBILE_BREAKPOINT = 760;
 const MOBILE_CAMERA_FOV = 60;
 const DESKTOP_CAMERA_FOV = 42;
+const MOBILE_EDGE_MARGIN = 0;
+const MOBILE_MODEL_SCALE = 1.68;
+const MOBILE_EDGE_CONTACT_ALIGN = 0.96;
+const MOBILE_MAX_RADF = 0.22;
+const TABLET_BREAKPOINT = 1100;
+const TABLET_CAMERA_FOV = 50;
+const TABLET_MODEL_SCALE = 1.28;
+const TABLET_RADIUS_MULTIPLIER = 2.1;
+const DESKTOP_RADIUS_MULTIPLIER = 1.18;
+const DESKTOP_MAX_RADF = 0.24;
 
 type CameraBase = {
   radius: number;
@@ -45,7 +56,10 @@ type SharedSceneState = {
   cameraBaseRef: RefObject<CameraBase>;
   currentScrollRef: RefObject<number>;
   dragRef: RefObject<DragState>;
+  leftEdgeGlowRef: RefObject<HTMLDivElement | null>;
+  modelRootRef: RefObject<Group | null>;
   modelStageRef: RefObject<HTMLDivElement | null>;
+  rightEdgeGlowRef: RefObject<HTMLDivElement | null>;
   targetScrollRef: RefObject<number>;
   timelineRef: RefObject<TimelineFrame[]>;
 };
@@ -55,15 +69,71 @@ type FootballModelProps = {
 };
 
 function getSceneViewportSettings() {
+  const viewportWidth = window.innerWidth;
   const aspect = window.innerWidth / window.innerHeight;
   const isCompactPortrait =
-    window.innerWidth <= MOBILE_BREAKPOINT || aspect < 0.82;
+    viewportWidth <= MOBILE_BREAKPOINT || aspect < 0.82;
+  const isTablet = viewportWidth <= TABLET_BREAKPOINT;
 
   return {
-    cameraFov: isCompactPortrait ? MOBILE_CAMERA_FOV : DESKTOP_CAMERA_FOV,
-    radiusMultiplier: isCompactPortrait ? 3.8 : 1,
-    shiftVW: isCompactPortrait ? 12 : 25,
+    cameraFov: isCompactPortrait
+      ? MOBILE_CAMERA_FOV
+      : isTablet
+        ? TABLET_CAMERA_FOV
+        : DESKTOP_CAMERA_FOV,
+    isCompactPortrait,
+    maxRadF: isCompactPortrait ? MOBILE_MAX_RADF : DESKTOP_MAX_RADF,
+    modelScale: isCompactPortrait
+      ? MOBILE_MODEL_SCALE
+      : isTablet
+        ? TABLET_MODEL_SCALE
+        : 1,
+    radiusMultiplier: isCompactPortrait
+      ? 3.8
+      : isTablet
+        ? TABLET_RADIUS_MULTIPLIER
+        : DESKTOP_RADIUS_MULTIPLIER,
   };
+}
+
+function getMobileEdgeProgress(align: number) {
+  return smoothstep(
+    Math.max(0, Math.min(1, Math.abs(align) / MOBILE_EDGE_CONTACT_ALIGN)),
+  );
+}
+
+function getModelScreenBounds(root: Group, camera: Camera) {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const point = new Vector3();
+  let minX = Infinity;
+  let maxX = -Infinity;
+
+  root.updateMatrixWorld(true);
+  root.traverse((child) => {
+    if (!(child instanceof Mesh)) return;
+
+    const position = child.geometry.getAttribute("position");
+
+    if (!position) return;
+
+    for (let index = 0; index < position.count; index += 1) {
+      point
+        .set(position.getX(index), position.getY(index), position.getZ(index))
+        .applyMatrix4(child.matrixWorld)
+        .project(camera);
+
+      const screenX = ((point.x + 1) / 2) * viewportWidth;
+      minX = Math.min(minX, screenX);
+      maxX = Math.max(maxX, screenX);
+    }
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    return null;
+  }
+
+  return { minX, maxX, viewportWidth, viewportHeight };
 }
 
 function tintMaterial(material: MeshStandardMaterial) {
@@ -107,9 +177,9 @@ function FootballModel({ onReady }: FootballModelProps) {
     const center = box.getCenter(new Vector3());
     const size = box.getSize(new Vector3());
     const maxDimension = Math.max(size.x, size.y, size.z) || 1;
-    const scale = MODEL_SCALE / maxDimension;
 
     prepareModelObject(gltf.scene);
+    const scale = MODEL_SCALE / maxDimension;
     model.scale.setScalar(scale);
     model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
     onReady();
@@ -127,7 +197,10 @@ function SceneRig({
   cameraBaseRef,
   currentScrollRef,
   dragRef,
+  leftEdgeGlowRef,
+  modelRootRef,
   modelStageRef,
+  rightEdgeGlowRef,
   targetScrollRef,
   timelineRef,
 }: SharedSceneState) {
@@ -178,7 +251,8 @@ function SceneRig({
       camera.updateProjectionMatrix();
     }
 
-    const radius = base.radius * radF * sceneSettings.radiusMultiplier;
+    const effectiveRadF = Math.min(radF, sceneSettings.maxRadF);
+    const radius = base.radius * effectiveRadF * sceneSettings.radiusMultiplier;
     const phi = base.phi + dragState.phi;
     const theta = base.theta + autoRotateThetaRef.current + dragState.theta;
     const camX = base.target[0] + radius * Math.cos(phi) * Math.sin(theta);
@@ -188,11 +262,45 @@ function SceneRig({
     camera.position.set(camX, camY, camZ);
     target.current.set(base.target[0], base.target[1], base.target[2]);
     camera.lookAt(target.current);
+    camera.updateMatrixWorld();
+
+    if (modelRootRef.current) {
+      modelRootRef.current.scale.setScalar(sceneSettings.modelScale);
+      modelRootRef.current.position.set(0, 0, 0);
+    }
 
     if (modelStageRef.current) {
+      const edgeProgress = getMobileEdgeProgress(align);
+      const edgeDirection = Math.sign(align);
+      const screenBounds = modelRootRef.current
+        ? getModelScreenBounds(modelRootRef.current, camera)
+        : null;
+      let edgeShiftPx = 0;
+
+      if (screenBounds && edgeDirection !== 0) {
+        edgeShiftPx =
+          edgeDirection > 0
+            ? screenBounds.viewportWidth - MOBILE_EDGE_MARGIN - screenBounds.maxX
+            : MOBILE_EDGE_MARGIN - screenBounds.minX;
+      }
+
       modelStageRef.current.style.transform = `translateX(${
-        align * sceneSettings.shiftVW
-      }vw)`;
+        edgeProgress * edgeShiftPx
+      }px)`;
+    }
+
+    const edgeGlow = smoothstep(
+      Math.max(0, (getMobileEdgeProgress(align) - 0.94) / 0.06),
+    );
+
+    if (leftEdgeGlowRef.current) {
+      leftEdgeGlowRef.current.style.opacity =
+        align < 0 ? String(edgeGlow) : "0";
+    }
+
+    if (rightEdgeGlowRef.current) {
+      rightEdgeGlowRef.current.style.opacity =
+        align > 0 ? String(edgeGlow) : "0";
     }
   });
 
@@ -201,8 +309,11 @@ function SceneRig({
 
 export function FootballScene() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const leftEdgeGlowRef = useRef<HTMLDivElement>(null);
   const loaderRef = useRef<HTMLDivElement>(null);
+  const modelRootRef = useRef<Group>(null);
   const modelStageRef = useRef<HTMLDivElement>(null);
+  const rightEdgeGlowRef = useRef<HTMLDivElement>(null);
   const cameraBaseRef = useRef<CameraBase>({
     radius: BASE_CAMERA_RADIUS,
     target: [0, 0, 0],
@@ -334,6 +445,16 @@ export function FootballScene() {
       <div id="loader" ref={loaderRef}>
         INITIALIZING...
       </div>
+      <div
+        aria-hidden="true"
+        className="mobile-edge-glow mobile-edge-glow--left"
+        ref={leftEdgeGlowRef}
+      />
+      <div
+        aria-hidden="true"
+        className="mobile-edge-glow mobile-edge-glow--right"
+        ref={rightEdgeGlowRef}
+      />
       <div id="model-container" ref={containerRef}>
         <div className="model-stage" ref={modelStageRef}>
           <Canvas
@@ -353,14 +474,19 @@ export function FootballScene() {
             <directionalLight intensity={0.8} position={[-5, -2, -4]} />
             <pointLight color="#00ff87" intensity={2.6} position={[0, 2, 3]} />
             <Suspense fallback={null}>
-              <FootballModel onReady={handleModelReady} />
+              <group ref={modelRootRef}>
+                <FootballModel onReady={handleModelReady} />
+              </group>
             </Suspense>
             <SceneRig
               autoRotateThetaRef={autoRotateThetaRef}
               cameraBaseRef={cameraBaseRef}
               currentScrollRef={currentScrollRef}
               dragRef={dragRef}
+              leftEdgeGlowRef={leftEdgeGlowRef}
+              modelRootRef={modelRootRef}
               modelStageRef={modelStageRef}
+              rightEdgeGlowRef={rightEdgeGlowRef}
               targetScrollRef={targetScrollRef}
               timelineRef={timelineRef}
             />

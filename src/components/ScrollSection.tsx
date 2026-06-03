@@ -1,27 +1,21 @@
 import type { ReactNode } from "react";
-import { ColorPicker } from "./ColorPicker";
-import type { ThemeName } from "../types";
 
 type ScrollSectionProps = {
   align: number;
   body?: string;
   finalCta?: boolean;
   hasThemePicker?: boolean;
-  onThemeChange: (theme: ThemeName) => void;
   radF: number;
   short?: boolean;
   side: "left" | "right" | "center";
-  activeTheme: ThemeName;
   title: ReactNode;
 };
 
 export function ScrollSection({
-  activeTheme,
   align,
   body,
   finalCta = false,
   hasThemePicker = false,
-  onThemeChange,
   radF,
   short = false,
   side,
@@ -39,9 +33,6 @@ export function ScrollSection({
           {title}
         </h1>
         {body && <p className="subtitle">{body}</p>}
-        {hasThemePicker && (
-          <ColorPicker activeTheme={activeTheme} onThemeChange={onThemeChange} />
-        )}
         {finalCta && (
           <div className="final-action" id="pre-order">
             <a className="cta-btn final-cta" href="#pre-order">

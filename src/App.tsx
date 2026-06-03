@@ -12,8 +12,8 @@ export function App() {
       <FootballScene />
       <AmbientCanvas />
       <div className="vignette" />
-      <Navigation />
-      <ScrollContent activeTheme={theme} onThemeChange={setTheme} />
+      <Navigation activeTheme={theme} onThemeChange={setTheme} />
+      <ScrollContent />
     </>
   );
 }
