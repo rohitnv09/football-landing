@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Football">
+  <rect width="64" height="64" rx="16" fill="#050806"/>
+  <circle cx="32" cy="32" r="22" fill="#00ff87"/>
+  <path d="M23 13a22 22 0 0 1 18 0l-4 12H27z" fill="#0a0a0a"/>
+  <path d="M10 30a22 22 0 0 1 8-14l7 10-8 7z" fill="#0a0a0a"/>
+  <path d="M54 30a22 22 0 0 0-8-14l-7 10 8 7z" fill="#0a0a0a"/>
+  <path d="M17 48a22 22 0 0 0 30 0l-10-8H27z" fill="#0a0a0a"/>
+  <path d="M27 25h10l7 8-7 8H27l-7-8z" fill="#050806"/>
+  <path d="M27 25 23 13M37 25l4-12M20 33l-10-3M44 33l10-3M27 41 17 48M37 41l10 7" stroke="#b7ffd5" stroke-width="1.4" stroke-linecap="round" opacity=".72"/>
+</svg>
