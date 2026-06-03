@@ -51,12 +51,20 @@ type DragState = {
   phi: number;
 };
 
+type ScreenHitBounds = {
+  centerX: number;
+  centerY: number;
+  radiusX: number;
+  radiusY: number;
+};
+
 type SharedSceneState = {
   autoRotateThetaRef: RefObject<number>;
   cameraBaseRef: RefObject<CameraBase>;
   currentScrollRef: RefObject<number>;
   dragRef: RefObject<DragState>;
   leftEdgeGlowRef: RefObject<HTMLDivElement | null>;
+  modelHitBoundsRef: RefObject<ScreenHitBounds | null>;
   modelRootRef: RefObject<Group | null>;
   modelStageRef: RefObject<HTMLDivElement | null>;
   rightEdgeGlowRef: RefObject<HTMLDivElement | null>;
@@ -108,6 +116,8 @@ function getModelScreenBounds(root: Group, camera: Camera) {
   const point = new Vector3();
   let minX = Infinity;
   let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
 
   root.updateMatrixWorld(true);
   root.traverse((child) => {
@@ -124,16 +134,38 @@ function getModelScreenBounds(root: Group, camera: Camera) {
         .project(camera);
 
       const screenX = ((point.x + 1) / 2) * viewportWidth;
+      const screenY = ((-point.y + 1) / 2) * viewportHeight;
       minX = Math.min(minX, screenX);
       maxX = Math.max(maxX, screenX);
+      minY = Math.min(minY, screenY);
+      maxY = Math.max(maxY, screenY);
     }
   });
 
-  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxY)
+  ) {
     return null;
   }
 
-  return { minX, maxX, viewportWidth, viewportHeight };
+  return { minX, maxX, minY, maxY, viewportWidth, viewportHeight };
+}
+
+function isPointInsideModelBounds(
+  x: number,
+  y: number,
+  bounds: ScreenHitBounds | null,
+) {
+  if (!bounds) return false;
+
+  const hitPadding = 1.08;
+  const normalizedX = (x - bounds.centerX) / (bounds.radiusX * hitPadding);
+  const normalizedY = (y - bounds.centerY) / (bounds.radiusY * hitPadding);
+
+  return normalizedX * normalizedX + normalizedY * normalizedY <= 1;
 }
 
 function tintMaterial(material: MeshStandardMaterial) {
@@ -198,6 +230,7 @@ function SceneRig({
   currentScrollRef,
   dragRef,
   leftEdgeGlowRef,
+  modelHitBoundsRef,
   modelRootRef,
   modelStageRef,
   rightEdgeGlowRef,
@@ -287,6 +320,17 @@ function SceneRig({
       modelStageRef.current.style.transform = `translateX(${
         edgeProgress * edgeShiftPx
       }px)`;
+
+      modelHitBoundsRef.current = screenBounds
+        ? {
+            centerX:
+              (screenBounds.minX + screenBounds.maxX) / 2 +
+              edgeProgress * edgeShiftPx,
+            centerY: (screenBounds.minY + screenBounds.maxY) / 2,
+            radiusX: Math.max(1, (screenBounds.maxX - screenBounds.minX) / 2),
+            radiusY: Math.max(1, (screenBounds.maxY - screenBounds.minY) / 2),
+          }
+        : null;
     }
 
     const edgeGlow = smoothstep(
@@ -313,6 +357,7 @@ export function FootballScene() {
   const loaderRef = useRef<HTMLDivElement>(null);
   const modelRootRef = useRef<Group>(null);
   const modelStageRef = useRef<HTMLDivElement>(null);
+  const modelHitBoundsRef = useRef<ScreenHitBounds | null>(null);
   const rightEdgeGlowRef = useRef<HTMLDivElement>(null);
   const cameraBaseRef = useRef<CameraBase>({
     radius: BASE_CAMERA_RADIUS,
@@ -381,6 +426,11 @@ export function FootballScene() {
     if (!container) return;
 
     const startDrag = (x: number, y: number) => {
+      if (!isPointInsideModelBounds(x, y, modelHitBoundsRef.current)) {
+        dragRef.current.active = false;
+        return;
+      }
+
       dragRef.current.active = true;
       dragRef.current.previousX = x;
       dragRef.current.previousY = y;
@@ -484,6 +534,7 @@ export function FootballScene() {
               currentScrollRef={currentScrollRef}
               dragRef={dragRef}
               leftEdgeGlowRef={leftEdgeGlowRef}
+              modelHitBoundsRef={modelHitBoundsRef}
               modelRootRef={modelRootRef}
               modelStageRef={modelStageRef}
               rightEdgeGlowRef={rightEdgeGlowRef}
